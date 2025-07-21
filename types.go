@@ -70,7 +70,9 @@ type Node struct {
 	// Attrs contains HTML attributes as key-value pairs
 	Attrs map[string]string `json:"attrs,omitempty"`
 	// Children contains child nodes
-	Children []Node `json:"children,omitempty"`
+	//Children []Node `json:"children,omitempty"`
+	//Children can be of type Node or string by design
+	Children []interface{} `json:"children,omitempty"`
 	// Content is the text content (for text nodes)
 	Content string `json:",omitempty"`
 }
@@ -359,8 +361,8 @@ func NewContentBuilder() *ContentBuilder {
 func (cb *ContentBuilder) AddParagraph(text string) *ContentBuilder {
 	cb.nodes = append(cb.nodes, Node{
 		Tag: "p",
-		Children: []Node{
-			{Content: text},
+		Children: []interface{}{
+			Node{Content: text},
 		},
 	})
 	return cb
@@ -375,8 +377,8 @@ func (cb *ContentBuilder) AddHeading(text string, level int) *ContentBuilder {
 
 	cb.nodes = append(cb.nodes, Node{
 		Tag: tag,
-		Children: []Node{
-			{Content: text},
+		Children: []interface{}{
+			Node{Content: text},
 		},
 	})
 	return cb
@@ -386,14 +388,14 @@ func (cb *ContentBuilder) AddHeading(text string, level int) *ContentBuilder {
 func (cb *ContentBuilder) AddLink(text, url string) *ContentBuilder {
 	cb.nodes = append(cb.nodes, Node{
 		Tag: "p",
-		Children: []Node{
-			{
+		Children: []interface{}{
+			Node{
 				Tag: "a",
 				Attrs: map[string]string{
 					"href": url,
 				},
-				Children: []Node{
-					{Content: text},
+				Children: []interface{}{
+					Node{Content: text},
 				},
 			},
 		},
@@ -416,8 +418,8 @@ func (cb *ContentBuilder) AddImage(src string) *ContentBuilder {
 func (cb *ContentBuilder) AddBlockquote(text string) *ContentBuilder {
 	cb.nodes = append(cb.nodes, Node{
 		Tag: "blockquote",
-		Children: []Node{
-			{Content: text},
+		Children: []interface{}{
+			Node{Content: text},
 		},
 	})
 	return cb
@@ -427,8 +429,8 @@ func (cb *ContentBuilder) AddBlockquote(text string) *ContentBuilder {
 func (cb *ContentBuilder) AddCodeBlock(code string) *ContentBuilder {
 	cb.nodes = append(cb.nodes, Node{
 		Tag: "pre",
-		Children: []Node{
-			{Content: code},
+		Children: []interface{}{
+			Node{Content: code},
 		},
 	})
 	return cb
@@ -457,14 +459,21 @@ func (cb *ContentBuilder) String() string {
 }
 
 // nodeToString converts a Node to its string representation
-func nodeToString(node Node) string {
-	if node.Content != "" {
-		return node.Content
-	}
-
+func nodeToString(node interface{}) string {
 	var result strings.Builder
-	for _, child := range node.Children {
-		result.WriteString(nodeToString(child))
+
+	// node can be of type Node or string
+	switch n := node.(type) {
+	case Node:
+		if n.Content != "" {
+			result.WriteString(n.Content)
+		}
+		for _, child := range n.Children {
+			result.WriteString(nodeToString(child))
+		}
+	case string:
+		// if it's a string, we just write it directly
+		result.WriteString(n)
 	}
 
 	return result.String()

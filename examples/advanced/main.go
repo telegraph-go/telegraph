@@ -51,6 +51,7 @@ func main() {
 	}
 
 	fmt.Printf("Account created: %s\n", account.ShortName)
+	log.Println(account)
 
 	// Create multiple pages with different content types
 	pages := []struct {
@@ -110,8 +111,10 @@ func main() {
 		// Edit the page to add more content
 		updatedContent := append(pageData.content, telegraph.Node{
 			Tag: "p",
-			Children: []telegraph.Node{
-				{Content: fmt.Sprintf("This article was last updated on %s.", time.Now().Format("2006-01-02"))},
+			Children: []interface{}{
+				telegraph.Node{
+					Content: fmt.Sprintf("This article was last updated on %s.", time.Now().Format("2006-01-02")),
+				},
 			},
 		})
 

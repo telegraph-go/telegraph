@@ -147,8 +147,8 @@ func TestClientCreatePage(t *testing.T) {
 		Content: []Node{
 			{
 				Tag: "p",
-				Children: []Node{
-					{Content: "Hello, World!"},
+				Children: []interface{}{
+					Node{Content: "Hello, World!"},
 				},
 			},
 		},
@@ -179,8 +179,8 @@ func TestClientGetPage(t *testing.T) {
 				Content: []Node{
 					{
 						Tag: "p",
-						Children: []Node{
-							{Content: "Hello, World!"},
+						Children: []interface{}{
+							Node{Content: "Hello, World!"},
 						},
 					},
 				},
@@ -466,8 +466,8 @@ func BenchmarkClientCreatePage(b *testing.B) {
 			Content: []Node{
 				{
 					Tag: "p",
-					Children: []Node{
-						{Content: "Hello, World!"},
+					Children: []interface{}{
+						Node{Content: "Hello, World!"},
 					},
 				},
 			},

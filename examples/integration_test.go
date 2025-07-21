@@ -63,8 +63,8 @@ func TestIntegration(t *testing.T) {
 	// Test page editing
 	updatedContent := append(content, telegraph.Node{
 		Tag: "p",
-		Children: []telegraph.Node{
-			{Content: "This is an updated paragraph."},
+		Children: []interface{}{
+			telegraph.Node{Content: "This is an updated paragraph."},
 		},
 	})
 

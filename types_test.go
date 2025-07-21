@@ -182,7 +182,7 @@ func TestCreatePageRequestValidation(t *testing.T) {
 				AccessToken: "test-token",
 				Title:       "Test Article",
 				Content: []Node{
-					{Tag: "p", Children: []Node{{Content: "Hello, World!"}}},
+					{Tag: "p", Children: []interface{}{Node{Content: "Hello, World!"}}},
 				},
 			},
 			wantErr: false,
@@ -371,28 +371,28 @@ func TestContentBuilder(t *testing.T) {
 
 		// Check paragraph
 		assert.Equal(t, "p", content[0].Tag)
-		assert.Equal(t, "Hello, World!", content[0].Children[0].Content)
+		assert.Equal(t, "Hello, World!", content[0].Children[0].(Node).Content)
 
 		// Check heading
 		assert.Equal(t, "h3", content[1].Tag)
-		assert.Equal(t, "Section 1", content[1].Children[0].Content)
+		assert.Equal(t, "Section 1", content[1].Children[0].(Node).Content)
 
 		// Check link
 		assert.Equal(t, "p", content[3].Tag)
-		assert.Equal(t, "a", content[3].Children[0].Tag)
-		assert.Equal(t, "https://example.com", content[3].Children[0].Attrs["href"])
-		assert.Equal(t, "Visit Example", content[3].Children[0].Children[0].Content)
+		assert.Equal(t, "a", content[3].Children[0].(Node).Tag)
+		assert.Equal(t, "https://example.com", content[3].Children[0].(Node).Attrs["href"])
+		assert.Equal(t, "Visit Example", content[3].Children[0].(Node).Children[0].(Node).Content)
 
 		// Check line break
 		assert.Equal(t, "br", content[4].Tag)
 
 		// Check blockquote
 		assert.Equal(t, "blockquote", content[5].Tag)
-		assert.Equal(t, "This is a quote.", content[5].Children[0].Content)
+		assert.Equal(t, "This is a quote.", content[5].Children[0].(Node).Content)
 
 		// Check code block
 		assert.Equal(t, "pre", content[6].Tag)
-		assert.Equal(t, "fmt.Println(\"Hello\")", content[6].Children[0].Content)
+		assert.Equal(t, "fmt.Println(\"Hello\")", content[6].Children[0].(Node).Content)
 	})
 
 	t.Run("string representation", func(t *testing.T) {
