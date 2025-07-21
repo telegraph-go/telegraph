@@ -7,7 +7,7 @@
 // Basic usage:
 //
 //	client := telegraph.NewClient()
-//	
+//
 //	// Create an account
 //	account, err := client.CreateAccount(context.Background(), &telegraph.CreateAccountRequest{
 //		ShortName: "MyBlog",
@@ -17,7 +17,7 @@
 //	if err != nil {
 //		log.Fatal(err)
 //	}
-//	
+//
 //	// Create a page
 //	page, err := client.CreatePage(context.Background(), &telegraph.CreatePageRequest{
 //		AccessToken: account.AccessToken,
@@ -57,7 +57,7 @@ type Client struct {
 
 // RetryConfig defines retry behavior for failed requests
 type RetryConfig struct {
-	MaxRetries int
+	MaxRetries   int
 	InitialDelay time.Duration
 	MaxDelay     time.Duration
 	Multiplier   float64
@@ -140,7 +140,7 @@ func (c *Client) doRequest(ctx context.Context, method, endpoint string, data in
 	}
 
 	url := fmt.Sprintf("%s/%s", c.baseURL, strings.TrimPrefix(endpoint, "/"))
-	
+
 	var lastErr error
 	for attempt := 0; attempt <= c.retryConfig.MaxRetries; attempt++ {
 		if attempt > 0 {
@@ -182,15 +182,13 @@ func (c *Client) doRequest(ctx context.Context, method, endpoint string, data in
 	return nil, fmt.Errorf("request failed after %d attempts: %w", c.retryConfig.MaxRetries+1, lastErr)
 }
 
-// calculateDelay calculates the delay for exponential backoff
 func (c *Client) calculateDelay(attempt int) time.Duration {
-	delay := time.Duration(float64(c.retryConfig.InitialDelay) * 
-		(1 << uint(attempt-1)) * c.retryConfig.Multiplier)
-	
+	delay := c.retryConfig.InitialDelay * time.Duration(1<<uint(attempt-1)) * time.Duration(c.retryConfig.Multiplier)
+
 	if delay > c.retryConfig.MaxDelay {
 		delay = c.retryConfig.MaxDelay
 	}
-	
+
 	return delay
 }
 

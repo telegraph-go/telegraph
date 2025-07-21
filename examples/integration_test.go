@@ -100,7 +100,7 @@ func TestIntegration(t *testing.T) {
 	// Test view statistics
 	// Wait a bit to ensure the page has been indexed
 	time.Sleep(2 * time.Second)
-	
+
 	views, err := client.GetViews(ctx, &telegraph.GetViewsRequest{
 		Path: page.Path,
 	})

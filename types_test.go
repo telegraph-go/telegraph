@@ -40,7 +40,7 @@ func TestCreateAccountRequestValidation(t *testing.T) {
 			name: "author name too long",
 			req: CreateAccountRequest{
 				ShortName:  "Test",
-				AuthorName: "This is a very long author name that definitely exceeds the maximum allowed length of 128 characters for the author name field",
+				AuthorName: "This is a very long author name that definitely exceeds the maximum allowed length of 128 characters for the author name field AAAAAAAAAAAAA!!!!!!!!!!!!!",
 			},
 			wantErr: true,
 			errMsg:  "author_name must be at most 128 characters",
@@ -368,38 +368,38 @@ func TestContentBuilder(t *testing.T) {
 			Build()
 
 		assert.Len(t, content, 7)
-		
+
 		// Check paragraph
 		assert.Equal(t, "p", content[0].Tag)
 		assert.Equal(t, "Hello, World!", content[0].Children[0].Content)
-		
+
 		// Check heading
 		assert.Equal(t, "h3", content[1].Tag)
 		assert.Equal(t, "Section 1", content[1].Children[0].Content)
-		
+
 		// Check link
 		assert.Equal(t, "p", content[3].Tag)
 		assert.Equal(t, "a", content[3].Children[0].Tag)
 		assert.Equal(t, "https://example.com", content[3].Children[0].Attrs["href"])
 		assert.Equal(t, "Visit Example", content[3].Children[0].Children[0].Content)
-		
+
 		// Check line break
 		assert.Equal(t, "br", content[4].Tag)
-		
+
 		// Check blockquote
 		assert.Equal(t, "blockquote", content[5].Tag)
 		assert.Equal(t, "This is a quote.", content[5].Children[0].Content)
-		
+
 		// Check code block
 		assert.Equal(t, "pre", content[6].Tag)
 		assert.Equal(t, "fmt.Println(\"Hello\")", content[6].Children[0].Content)
 	})
-	
+
 	t.Run("string representation", func(t *testing.T) {
 		content := NewContentBuilder().
 			AddParagraph("Hello").
 			AddParagraph("World")
-		
+
 		str := content.String()
 		assert.Contains(t, str, "Hello")
 		assert.Contains(t, str, "World")
@@ -411,14 +411,14 @@ func TestIsValidURL(t *testing.T) {
 		url   string
 		valid bool
 	}{
-		{"", true},                                    // Empty string is valid
-		{"https://example.com", true},                 // Valid HTTPS URL
-		{"http://example.com", true},                  // Valid HTTP URL
-		{"https://example.com/path", true},            // Valid URL with path
+		{"", true},                                     // Empty string is valid
+		{"https://example.com", true},                  // Valid HTTPS URL
+		{"http://example.com", true},                   // Valid HTTP URL
+		{"https://example.com/path", true},             // Valid URL with path
 		{"https://example.com/path?query=value", true}, // Valid URL with query
-		{"not-a-url", false},                          // Invalid URL
-		{"ftp://example.com", false},                  // Invalid scheme
-		{"https://", false},                           // Invalid URL
+		{"not-a-url", false},                           // Invalid URL
+		{"ftp://example.com", false},                   // Invalid scheme
+		{"https://", false},                            // Invalid URL
 	}
 
 	for _, tt := range tests {
@@ -436,7 +436,7 @@ func TestAPIError(t *testing.T) {
 		}
 		assert.Equal(t, "Telegraph API error (code 400): Bad Request", err.Error())
 	})
-	
+
 	t.Run("without code", func(t *testing.T) {
 		err := &APIError{
 			Description: "Something went wrong",

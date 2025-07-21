@@ -151,7 +151,7 @@ func (r *GetAccountInfoRequest) Validate() error {
 	if r.AccessToken == "" {
 		return fmt.Errorf("access_token is required")
 	}
-	
+
 	validFields := map[string]bool{
 		"short_name":  true,
 		"author_name": true,
@@ -159,13 +159,13 @@ func (r *GetAccountInfoRequest) Validate() error {
 		"auth_url":    true,
 		"page_count":  true,
 	}
-	
+
 	for _, field := range r.Fields {
 		if !validFields[field] {
 			return fmt.Errorf("invalid field: %s", field)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -337,7 +337,7 @@ func isValidURL(str string) bool {
 	if str == "" {
 		return true
 	}
-	
+
 	// Basic URL validation
 	urlRegex := regexp.MustCompile(`^https?://[^\s/$.?#].[^\s]*$`)
 	return urlRegex.MatchString(str)
@@ -372,7 +372,7 @@ func (cb *ContentBuilder) AddHeading(text string, level int) *ContentBuilder {
 	if level == 4 {
 		tag = "h4"
 	}
-	
+
 	cb.nodes = append(cb.nodes, Node{
 		Tag: tag,
 		Children: []Node{
@@ -461,11 +461,11 @@ func nodeToString(node Node) string {
 	if node.Content != "" {
 		return node.Content
 	}
-	
+
 	var result strings.Builder
 	for _, child := range node.Children {
 		result.WriteString(nodeToString(child))
 	}
-	
+
 	return result.String()
 }
