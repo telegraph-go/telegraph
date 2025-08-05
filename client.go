@@ -43,6 +43,7 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/net/html"
 	"golang.org/x/time/rate"
 )
 
@@ -499,4 +500,200 @@ func (c *Client) GetViews(ctx context.Context, req *GetViewsRequest) (*PageViews
 	}
 
 	return &views, nil
+}
+
+// HTMLToPageOptions represents options for converting HTML to a Telegraph Page
+type HTMLToPageOptions struct {
+	AuthorName string
+	AuthorURL  string
+}
+
+// ConvertHTMLToPage converts an HTML string into a Telegraph Page object.
+// It extracts metadata like title, author name, and author URL from meta tags,
+// and converts the HTML body into a slice of Node objects, handling supported
+// and unsupported tags, and skipping script tags.
+func (c *Client) ConvertHTMLToPage(htmlContent string, opts *HTMLToPageOptions) (*Page, error) {
+	doc, err := html.Parse(strings.NewReader(htmlContent))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse HTML: %w", err)
+	}
+
+	page := &Page{}
+
+	// Extract metadata
+	c.extractMetadata(doc, page, opts)
+
+	// Parse body content
+	bodyContent, err := c.parseHTMLBody(doc)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse HTML body: %w", err)
+	}
+	page.Content = bodyContent
+
+	return page, nil
+}
+
+// extractMetadata extracts title, author name, and author URL from HTML meta tags.
+func (c *Client) extractMetadata(doc *html.Node, page *Page, opts *HTMLToPageOptions) {
+	var f func(*html.Node)
+	f = func(n *html.Node) {
+		if n.Type == html.ElementNode && n.Data == "title" && n.FirstChild != nil {
+			page.Title = n.FirstChild.Data
+		}
+		if n.Type == html.ElementNode && n.Data == "meta" {
+			var name, content string
+			for _, a := range n.Attr {
+				if a.Key == "name" {
+					name = a.Val
+				}
+				if a.Key == "content" {
+					content = a.Val
+				}
+			}
+			switch name {
+			case "author":
+				if page.AuthorName == "" {
+					page.AuthorName = content
+				}
+			case "url":
+				if page.AuthorURL == "" {
+					page.AuthorURL = content
+				}
+			case "description":
+				page.Description = content
+			}
+		}
+		for child := n.FirstChild; child != nil; child = child.NextSibling {
+			f(child)
+		}
+	}
+	f(doc)
+
+	if opts != nil {
+		if opts.AuthorName != "" {
+			page.AuthorName = opts.AuthorName
+		}
+		if opts.AuthorURL != "" {
+			page.AuthorURL = opts.AuthorURL
+		}
+	}
+}
+
+// parseHTMLBody parses the HTML body and converts it into a slice of Node objects.
+func (c *Client) parseHTMLBody(doc *html.Node) ([]Node, error) {
+	var body *html.Node
+	var f func(*html.Node)
+	f = func(n *html.Node) {
+		if n.Type == html.ElementNode && n.Data == "body" {
+			body = n
+			return
+		}
+		for child := n.FirstChild; child != nil; child = child.NextSibling {
+			f(child)
+		}
+	}
+	f(doc)
+
+	if body == nil {
+		return nil, fmt.Errorf("HTML document has no body tag")
+	}
+
+	return c.htmlNodeToTelegraphNodes(body), nil
+}
+
+// htmlNodeToTelegraphNodes recursively converts an HTML node and its children
+// into Telegraph Node objects. It skips script tags and tries to map
+// unsupported tags to semantically closest supported tags.
+func (c *Client) htmlNodeToTelegraphNodes(n *html.Node) []Node {
+	var nodes []Node
+	for child := n.FirstChild; child != nil; child = child.NextSibling {
+		if child.Type == html.TextNode {
+			// Do not trim space here; Telegraph API can have spaces in text nodes
+			if child.Data != "" {
+				nodes = append(nodes, Node{Content: child.Data})
+			}
+			continue
+		}
+
+		if child.Type != html.ElementNode {
+			continue
+		}
+
+		// Skip script tags
+		if child.Data == "script" || child.Data == "style" {
+			continue
+		}
+
+		node := Node{
+			Tag: c.mapTag(child.Data),
+		}
+
+		// Add attributes
+		if len(child.Attr) > 0 {
+			node.Attrs = make(map[string]string)
+			for _, a := range child.Attr {
+				// Only 'href' and 'src' attributes are supported
+				if a.Key == "href" || a.Key == "src" {
+					node.Attrs[a.Key] = a.Val
+				}
+			}
+		}
+
+		// Recursively convert children
+		children := c.htmlNodeToTelegraphNodes(child)
+		if len(children) > 0 {
+			// If the current node is a simple text wrapper like p, and its only child
+			// is a text node, directly assign the content to the current node to avoid
+			// unnecessary nesting. This needs to be carefully handled to match Telegraph's Node structure.
+			// Telegraph's Node can have 'Content' OR 'Children', not both for a single Node.
+			// The `Node` struct has `Content` and `Children []interface{}`.
+			// Text nodes are represented by `Node{Content: "text"}`
+			// Element nodes are represented by `Node{Tag: "tag", Children: []interface{}}`
+			// This means if an element node has only text, it still needs to be a child node.
+			// Example: <p>Hello</p> -> Node{Tag: "p", Children: []interface{}{Node{Content: "Hello"}}}
+			node.Children = make([]interface{}, len(children))
+			for i, ch := range children {
+				// If a child is a text node (Node with only Content), just append its content string directly.
+				// This might require a change in how Node.Children is defined if it's currently []Node.
+				// Based on types.go: Children []interface{}, so direct strings are allowed.
+				if ch.Content != "" && ch.Tag == "" && ch.Attrs == nil && ch.Children == nil {
+					node.Children[i] = ch.Content
+				} else {
+					node.Children[i] = ch
+				}
+			}
+		}
+
+		nodes = append(nodes, node)
+	}
+	return nodes
+}
+
+// mapTag maps unsupported HTML tags to the closest semantically supported Telegraph tags.
+func (c *Client) mapTag(tag string) string {
+	switch tag {
+	case "h1", "h2":
+		return "h3" // Map h1, h2 to h3 as h3 is the highest supported heading
+	case "b":
+		return "strong"
+	case "i":
+		return "em"
+	case "ul", "ol", "li": // ul, ol, li are supported. No mapping needed.
+		return tag
+	case "div", "span": // Generic containers, try to map to paragraph if they contain text
+		return "p"
+	default:
+		// Check if the tag is explicitly supported by Telegraph API.
+		// Available tags: a, aside, b, blockquote, br, code, em, figcaption, figure, h3, h4, hr, i, iframe, img, li, ol, p, pre, s, strong, u, ul, video.
+		supportedTags := map[string]bool{
+			"a": true, "aside": true, "b": true, "blockquote": true, "br": true, "code": true,
+			"em": true, "figcaption": true, "figure": true, "h3": true, "h4": true, "hr": true,
+			"i": true, "iframe": true, "img": true, "li": true, "ol": true, "p": true, "pre": true,
+			"s": true, "strong": true, "u": true, "ul": true, "video": true,
+		}
+		if supportedTags[tag] {
+			return tag
+		}
+		return "p" // Default to paragraph for unsupported or unknown tags
+	}
 }

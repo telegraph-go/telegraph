@@ -414,6 +414,172 @@ func TestClientContextCancellation(t *testing.T) {
 	assert.Contains(t, err.Error(), "context deadline exceeded")
 }
 
+func TestConvertHTMLToPage(t *testing.T) {
+	client := NewClient()
+
+	tests := []struct {
+		name         string
+		html         string
+		opts         *HTMLToPageOptions
+		expectedPage *Page
+		expectedErr  error
+	}{
+		{
+			name: "simple html",
+			html: `<html><head><title>My Title</title></head><body><p>Hello, <b>world</b>!</p></body></html>`,
+			expectedPage: &Page{
+				Title: "My Title",
+				Content: []Node{
+					{Tag: "p", Children: []interface{}{"Hello, ", Node{Tag: "strong", Children: []interface{}{"world"}}, "!"}},
+				},
+			},
+		},
+		{
+			name: "html with meta tags",
+			html: `<html><head><title>Test Article</title><meta name="author" content="Jane Doe"><meta name="url" content="https://example.com/jane"></head><body><h1>Welcome</h1><p>Content here.</p></body></html>`,
+			expectedPage: &Page{
+				Title:      "Test Article",
+				AuthorName: "Jane Doe",
+				AuthorURL:  "https://example.com/jane",
+				Content: []Node{
+					{Tag: "h3", Children: []interface{}{"Welcome"}},
+					{Tag: "p", Children: []interface{}{"Content here."}},
+				},
+			},
+		},
+		{
+			name: "html with options overriding meta tags",
+			html: `<html><head><title>Test Article</title><meta name="author" content="Jane Doe"></head><body><p>Content here.</p></body></html>`,
+			opts: &HTMLToPageOptions{AuthorName: "Override Author"},
+			expectedPage: &Page{
+				Title:      "Test Article",
+				AuthorName: "Override Author",
+				Content: []Node{
+					{Tag: "p", Children: []interface{}{"Content here."}},
+				},
+			},
+		},
+		{
+			name: "html with unsupported tags and scripts",
+			html: `<html><head><title>Mixed Content</title></head><body><section><h2>Section Title</h2><p>Some text.</p><script>alert('hi');</script><div>Another div</div><ul><li>Item 1</li></ul></body></html>`,
+			expectedPage: &Page{
+				Title: "Mixed Content",
+				Content: []Node{
+					{Tag: "p", Children: []interface{}{
+						Node{Tag: "h3", Children: []interface{}{"Section Title"}},
+						Node{Tag: "p", Children: []interface{}{"Some text."}},
+						Node{Tag: "p", Children: []interface{}{"Another div"}},
+						Node{Tag: "ul", Children: []interface{}{Node{Tag: "li", Children: []interface{}{"Item 1"}}}},
+					}},
+				},
+			},
+		},
+		{
+			name: "html with image and link",
+			html: `<html><body><p>Check this <a href="https://example.com">link</a> and an <img src="image.jpg"> image.</p></body></html>`,
+			expectedPage: &Page{
+				Content: []Node{
+					{Tag: "p", Children: []interface{}{"Check this ", Node{Tag: "a", Attrs: map[string]string{"href": "https://example.com"}, Children: []interface{}{"link"}}, " and an ", Node{Tag: "img", Attrs: map[string]string{"src": "image.jpg"}}, " image."}},
+				},
+			},
+		},
+		{
+			name: "empty body",
+			html: `<html><head><title>Empty</title></head><body></body></html>`,
+			expectedPage: &Page{
+				Title:   "Empty",
+				Content: []Node{},
+			},
+		},
+		{
+			name: "no body tag",
+			html: `<html><head><title>No Body</title></head></html>`,
+			expectedPage: &Page{
+				Title:   "No Body",
+				Content: []Node{},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			page, err := client.ConvertHTMLToPage(tt.html, tt.opts)
+
+			if tt.expectedErr != nil {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedErr.Error())
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.expectedPage.Title, page.Title)
+			assert.Equal(t, tt.expectedPage.AuthorName, page.AuthorName)
+			assert.Equal(t, tt.expectedPage.AuthorURL, page.AuthorURL)
+			assert.Equal(t, tt.expectedPage.Description, page.Description)
+
+			// Custom assertion for content due to interface{} slice comparison complexities
+			assertNodesEqual(t, tt.expectedPage.Content, page.Content)
+		})
+	}
+}
+
+// assertNodesEqual recursively compares two slices of Node objects
+func assertNodesEqual(t *testing.T, expected, actual []Node) bool {
+	if !assert.Len(t, actual, len(expected), "Node slices should have the same length") {
+		return false
+	}
+
+	for i := range expected {
+		if !assertNodeEqual(t, expected[i], actual[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+// assertNodeEqual recursively compares two Node objects
+func assertNodeEqual(t *testing.T, expected, actual Node) bool {
+	if !assert.Equal(t, expected.Tag, actual.Tag, "Tags should be equal") {
+		return false
+	}
+	if !assert.Equal(t, expected.Content, actual.Content, "Contents should be equal") {
+		return false
+	}
+
+	if !assert.Equal(t, expected.Attrs, actual.Attrs, "Attributes should be equal") {
+		return false
+	}
+
+	// Compare children recursively
+	if !assert.Len(t, actual.Children, len(expected.Children), "Children slices should have the same length") {
+		return false
+	}
+	for i := range expected.Children {
+		expChild := expected.Children[i]
+		actChild := actual.Children[i]
+
+		switch expC := expChild.(type) {
+		case string:
+			if !assert.IsType(t, expC, actChild, "Child should be string") {
+				return false
+			}
+			if !assert.Equal(t, expC, actChild, "String children should be equal") {
+				return false
+			}
+		case Node:
+			if !assert.IsType(t, expC, actChild, "Child should be Node") {
+				return false
+			}
+			if !assertNodeEqual(t, expC, actChild.(Node)) {
+				return false
+			}
+		default:
+			return assert.Fail(t, "Unexpected type in expected children")
+		}
+	}
+	return true
+}
+
 // Benchmark tests
 func BenchmarkClientCreateAccount(b *testing.B) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
