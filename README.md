@@ -17,6 +17,7 @@ A comprehensive Go SDK for the [Telegraph API](https://telegra.ph/api) that prov
 - **Thread Safe**: Concurrent usage safe
 - **Configurable**: Customizable HTTP client, timeouts, and retry behavior
 - **Content Builder**: Fluent interface for building Telegraph content
+- **HTML to Page Conversion**: Convert HTML strings to Telegraph Page objects
 - **Comprehensive Testing**: >95% test coverage with unit and integration tests
 
 ## Installation
@@ -73,6 +74,14 @@ func main() {
     }
 
     fmt.Printf("Page created: %s\n", page.URL)
+
+    // Convert HTML to Telegraph Page
+    htmlContent := `<html><head><title>My HTML Article</title><meta name="author" content="HTML Author"></head><body><h1>Hello</h1><p>This is from HTML.</p></body></html>`
+    htmlPage, err := client.ConvertHTMLToPage(htmlContent, &telegraph.HTMLToPageOptions{AuthorURL: "https://html-author.com"})
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Printf("HTML Page Title: %s, Author: %s, URL: %s\n", htmlPage.Title, htmlPage.AuthorName, htmlPage.AuthorURL)
 }
 ```
 
@@ -341,6 +350,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Comprehensive error handling
 - Rate limiting and retry logic
 - Content builder utility
+- HTML to Page Conversion
 - Full test coverage
 - Documentation and examples
 
